@@ -23,8 +23,8 @@ const FSEventModify FSEventType = 2
 type FSEvent struct {
 	Path             string
 	EventType        FSEventType
-	FileInfo         *os.FileInfo
-	PreviousFileInfo *os.FileInfo
+	FileInfo         os.FileInfo
+	PreviousFileInfo os.FileInfo
 }
 
 // Watcher ...
@@ -32,7 +32,7 @@ type Watcher struct {
 	Path      string
 	Interval  time.Duration
 	EventChan chan FSEvent
-	index     map[string]*os.FileInfo
+	index     map[string]os.FileInfo
 	active    bool
 }
 
@@ -50,9 +50,9 @@ func NewWatcher(path string, interval time.Duration) (*Watcher, error) {
 		return nil, fmt.Errorf("failed to get abspath for %v", path)
 	}
 	w.EventChan = make(chan FSEvent)
-	w.index = make(map[string]*os.FileInfo)
+	w.index = make(map[string]os.FileInfo)
 	err = filepath.Walk(w.Path, func(path string, info os.FileInfo, err error) error {
-		w.index[path] = &info
+		w.index[path] = info
 		return nil
 	})
 	if err != nil {
@@ -71,12 +71,12 @@ func (w *Watcher) Stop() {
 
 func (w *Watcher) watch() {
 	for w.active {
-		fsstate := make(map[string]*os.FileInfo)
+		fsstate := make(map[string]os.FileInfo)
 		err := filepath.Walk(w.Path, func(path string, info os.FileInfo, err error) error {
 			if info == nil {
 				return nil
 			}
-			fsstate[path] = &info
+			fsstate[path] = info
 			return nil
 		})
 		if err != nil {
@@ -91,7 +91,7 @@ func (w *Watcher) watch() {
 	}
 }
 
-func (w *Watcher) checkDelete(fsstate map[string]*os.FileInfo) {
+func (w *Watcher) checkDelete(fsstate map[string]os.FileInfo) {
 	for oldkey := range w.index {
 		if _, ok := fsstate[oldkey]; !ok {
 			e := FSEvent{
@@ -106,7 +106,7 @@ func (w *Watcher) checkDelete(fsstate map[string]*os.FileInfo) {
 	}
 }
 
-func (w *Watcher) checkCreate(fsstate map[string]*os.FileInfo) {
+func (w *Watcher) checkCreate(fsstate map[string]os.FileInfo) {
 	for newkey, newval := range fsstate {
 		if _, ok := w.index[newkey]; !ok {
 			e := FSEvent{
@@ -121,11 +121,11 @@ func (w *Watcher) checkCreate(fsstate map[string]*os.FileInfo) {
 	}
 }
 
-func (w *Watcher) checkModify(fsstate map[string]*os.FileInfo) {
+func (w *Watcher) checkModify(fsstate map[string]os.FileInfo) {
 	for newkey, newval := range fsstate {
 		oldval := w.index[newkey]
-		if (*oldval).IsDir() != (*newval).IsDir() || (*oldval).ModTime() != (*newval).ModTime() ||
-			(*oldval).Mode() != (*newval).Mode() || (*oldval).Size() != (*newval).Size() {
+		if oldval.IsDir() != newval.IsDir() || oldval.ModTime() != newval.ModTime() ||
+			oldval.Mode() != newval.Mode() || oldval.Size() != newval.Size() {
 			e := FSEvent{
 				Path:             newkey,
 				EventType:        FSEventModify,
