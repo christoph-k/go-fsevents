@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -34,6 +35,7 @@ type Watcher struct {
 	EventChan chan FSEvent
 	index     map[string]os.FileInfo
 	active    bool
+	mux       sync.Mutex
 }
 
 // NewWatcher ...
@@ -59,6 +61,8 @@ func NewWatcher(path string, interval time.Duration) (*Watcher, error) {
 		return nil, fmt.Errorf("initial scan failed (%v)", err)
 	}
 	go w.watch()
+	w.mux.Lock()
+	defer w.mux.Unlock()
 	w.active = true
 	return w, nil
 }
@@ -66,10 +70,14 @@ func NewWatcher(path string, interval time.Duration) (*Watcher, error) {
 // Stop ...
 func (w *Watcher) Stop() {
 	close(w.EventChan)
+	w.mux.Lock()
+	defer w.mux.Unlock()
 	w.active = false
 }
 
 func (w *Watcher) watch() {
+	w.mux.Lock()
+	defer w.mux.Unlock()
 	for w.active {
 		fsstate := make(map[string]os.FileInfo)
 		err := filepath.Walk(w.Path, func(path string, info os.FileInfo, err error) error {
