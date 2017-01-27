@@ -69,10 +69,10 @@ func NewWatcher(path string, interval time.Duration) (*Watcher, error) {
 
 // Stop ...
 func (w *Watcher) Stop() {
-	close(w.EventChan)
 	w.mux.Lock()
 	defer w.mux.Unlock()
 	w.active = false
+	close(w.EventChan)
 }
 
 func (w *Watcher) watch() {
