@@ -60,10 +60,8 @@ func NewWatcher(path string, interval time.Duration) (*Watcher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initial scan failed (%v)", err)
 	}
-	go w.watch()
-	w.mux.Lock()
-	defer w.mux.Unlock()
 	w.active = true
+	go w.watch()
 	return w, nil
 }
 
@@ -76,8 +74,6 @@ func (w *Watcher) Stop() {
 }
 
 func (w *Watcher) watch() {
-	w.mux.Lock()
-	defer w.mux.Unlock()
 	for w.active {
 		fsstate := make(map[string]os.FileInfo)
 		err := filepath.Walk(w.Path, func(path string, info os.FileInfo, err error) error {
@@ -100,6 +96,11 @@ func (w *Watcher) watch() {
 }
 
 func (w *Watcher) checkDelete(fsstate map[string]os.FileInfo) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	if !w.active {
+		return
+	}
 	for oldkey := range w.index {
 		if _, ok := fsstate[oldkey]; !ok {
 			e := FSEvent{
@@ -115,6 +116,11 @@ func (w *Watcher) checkDelete(fsstate map[string]os.FileInfo) {
 }
 
 func (w *Watcher) checkCreate(fsstate map[string]os.FileInfo) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	if !w.active {
+		return
+	}
 	for newkey, newval := range fsstate {
 		if _, ok := w.index[newkey]; !ok {
 			e := FSEvent{
@@ -130,6 +136,11 @@ func (w *Watcher) checkCreate(fsstate map[string]os.FileInfo) {
 }
 
 func (w *Watcher) checkModify(fsstate map[string]os.FileInfo) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	if !w.active {
+		return
+	}
 	for newkey, newval := range fsstate {
 		oldval := w.index[newkey]
 		if oldval.IsDir() != newval.IsDir() || oldval.ModTime() != newval.ModTime() ||
