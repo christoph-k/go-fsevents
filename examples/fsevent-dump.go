@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/christoph-k/go-fsevents"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"github.com/christoph-k/go-fsevents"
 )
 
 func main() {
@@ -21,6 +24,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		<-sigChan
+		w.Stop()
+		os.Exit(0)
+	}()
+
 	for {
 		e := <-w.EventChan
 		switch e.EventType {
